@@ -76,7 +76,8 @@ void PutLengthPrefixedSlice(std::string* dst, const Slice& value) {
 
 int VarintLength(uint64_t v) {
   int len = 1;
-  while (v >= 128) {
+  // 128 == 2的7次方
+  while (v >= 128) { 
     v >>= 7;
     len++;
   }

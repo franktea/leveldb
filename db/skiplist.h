@@ -131,6 +131,9 @@ class SkipList {
   Comparator const compare_;
   Arena* const arena_;  // Arena used for allocations of nodes
 
+  // 只记录头结点。头结点并不存储任何值。head_的下一个节点才是链表真正的头结点，
+  // 相当于单链表处理时的dummy头节点，为了操作简单方便。
+  // 没有专门的尾结点变量，任何一个next为null的节点就是该层的尾结点。
   Node* const head_;
 
   // Modified only by Insert().  Read racily by readers, but stale
@@ -241,8 +244,9 @@ inline void SkipList<Key, Comparator>::Iterator::SeekToLast() {
 template <typename Key, class Comparator>
 int SkipList<Key, Comparator>::RandomHeight() {
   // Increase height with probability 1 in kBranching
-  static const unsigned int kBranching = 4;
+  static const unsigned int kBranching = 4; // 每次有1/4的概率增加1
   int height = 1;
+  // 为什么要用这个循环，直接生成一个随机值不好么？
   while (height < kMaxHeight && ((rnd_.Next() % kBranching) == 0)) {
     height++;
   }
@@ -257,6 +261,7 @@ bool SkipList<Key, Comparator>::KeyIsAfterNode(const Key& key, Node* n) const {
   return (n != nullptr) && (compare_(n->key, key) < 0);
 }
 
+// 返回>=key的第一个节点，参数prev返回每一层的前一个节点
 template <typename Key, class Comparator>
 typename SkipList<Key, Comparator>::Node*
 SkipList<Key, Comparator>::FindGreaterOrEqual(const Key& key,
@@ -269,8 +274,9 @@ SkipList<Key, Comparator>::FindGreaterOrEqual(const Key& key,
       // Keep searching in this list
       x = next;
     } else {
+      // prev是一个数组，函数一直遍历到最底层才会返回，返回时prev整个数组的每个元素都会被设置上
       if (prev != nullptr) prev[level] = x;
-      if (level == 0) {
+      if (level == 0) { // 一定是level为0时才返回，此时prev的每个元素都被设置上了
         return next;
       } else {
         // Switch to next list
@@ -280,6 +286,7 @@ SkipList<Key, Comparator>::FindGreaterOrEqual(const Key& key,
   }
 }
 
+// 找到第一个skiplist中适合插入key的位置，该位置后面的节点大于等于key，前面小于key
 template <typename Key, class Comparator>
 typename SkipList<Key, Comparator>::Node*
 SkipList<Key, Comparator>::FindLessThan(const Key& key) const {
@@ -337,13 +344,14 @@ template <typename Key, class Comparator>
 void SkipList<Key, Comparator>::Insert(const Key& key) {
   // TODO(opt): We can use a barrier-free variant of FindGreaterOrEqual()
   // here since Insert() is externally synchronized.
+   // prev是用来记录新插入节点的每一层的上一个节点的
   Node* prev[kMaxHeight];
   Node* x = FindGreaterOrEqual(key, prev);
 
   // Our data structure does not allow duplicate insertion
   assert(x == nullptr || !Equal(key, x->key));
 
-  int height = RandomHeight();
+  const int height = RandomHeight();
   if (height > GetMaxHeight()) {
     for (int i = GetMaxHeight(); i < height; i++) {
       prev[i] = head_;

@@ -42,7 +42,7 @@ static const int kL0_StopWritesTrigger = 12;
 static const int kMaxMemCompactLevel = 2;
 
 // Approximate gap in bytes between samples of data read during iteration.
-static const int kReadBytesPeriod = 1048576;
+static const int kReadBytesPeriod = 1048576; // 1MB
 
 }  // namespace config
 
@@ -64,6 +64,7 @@ typedef uint64_t SequenceNumber;
 
 // We leave eight bits empty at the bottom so a type and sequence#
 // can be packed together into 64-bits.
+// 从右到左连续的56个1（不是55个）
 static const SequenceNumber kMaxSequenceNumber = ((0x1ull << 56) - 1);
 
 struct ParsedInternalKey {

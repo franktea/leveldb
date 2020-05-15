@@ -50,11 +50,13 @@ class Random {
 
   // Randomly returns true ~"1/n" of the time, and false otherwise.
   // REQUIRES: n > 0
+  // 对于1/n概率返回true，否则返回false
   bool OneIn(int n) { return (Next() % n) == 0; }
 
   // Skewed: pick "base" uniformly from range [0,max_log] and then
   // return "base" random bits.  The effect is to pick a number in the
   // range [0,2^max_log-1] with exponential bias towards smaller numbers.
+  // 函数名应该来源于Skewed Distribution（偏态分布）。
   uint32_t Skewed(int max_log) { return Uniform(1 << Uniform(max_log + 1)); }
 };
 

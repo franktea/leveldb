@@ -1384,7 +1384,7 @@ bool DBImpl::GetProperty(const Slice& property, std::string* value) {
 
   MutexLock l(&mutex_);
   Slice in = property;
-  Slice prefix("leveldb.");
+  Slice prefix("leveldb."); // property必须以leveldb.开头
   if (!in.starts_with(prefix)) return false;
   in.remove_prefix(prefix.size());
 
@@ -1522,7 +1522,7 @@ Snapshot::~Snapshot() = default;
 
 Status DestroyDB(const std::string& dbname, const Options& options) {
   Env* env = options.env;
-  std::vector<std::string> filenames;
+  std::vector<std::string> filenames; // 目录名叫dbname下面的所有文件名
   Status result = env->GetChildren(dbname, &filenames);
   if (!result.ok()) {
     // Ignore error in case directory does not exist

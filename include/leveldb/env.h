@@ -21,6 +21,8 @@
 #include "leveldb/export.h"
 #include "leveldb/status.h"
 
+// 文件、目录操作、文件锁、日志功能
+
 // This workaround can be removed when leveldb::Env::DeleteFile is removed.
 #if defined(_WIN32)
 // On Windows, the method name DeleteFile (below) introduces the risk of

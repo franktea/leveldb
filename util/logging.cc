@@ -23,9 +23,11 @@ void AppendNumberTo(std::string* str, uint64_t num) {
 void AppendEscapedStringTo(std::string* str, const Slice& value) {
   for (size_t i = 0; i < value.size(); i++) {
     char c = value[i];
-    if (c >= ' ' && c <= '~') {
+    // 32~126之间的字符是可见字符。其实127也是，但是127是delete，此处未考虑127。
+    // 对于可见字符直接添加。
+    if (c >= ' ' && c <= '~') { 
       str->push_back(c);
-    } else {
+    } else { // 不可见字符转化为16进制然后添加
       char buf[10];
       std::snprintf(buf, sizeof(buf), "\\x%02x",
                     static_cast<unsigned int>(c) & 0xff);

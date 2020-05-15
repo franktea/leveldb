@@ -48,6 +48,7 @@ class MemTable {
   // while the returned iterator is live.  The keys returned by this
   // iterator are internal keys encoded by AppendInternalKey in the
   // db/format.{h,cc} module.
+  // 为什么要new一块需要调用者释放的内存？
   Iterator* NewIterator();
 
   // Add an entry into memtable that maps key to value at the

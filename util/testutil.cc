@@ -39,6 +39,7 @@ Slice CompressibleString(Random* rnd, double compressed_fraction, size_t len,
   RandomString(rnd, raw, &raw_data);
 
   // Duplicate the random data until we have filled "len" bytes
+  // 先填充到大于等于len个字符，然后用resize把末尾多余的字符干掉
   dst->clear();
   while (dst->size() < len) {
     dst->append(raw_data);

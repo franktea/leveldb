@@ -24,8 +24,12 @@ enum RecordType {
 };
 static const int kMaxRecordType = kLastType;
 
+// 写入文件时以32k为一个block，将一个一个的slice放置在一个一个的block中。
+// 具体格式可以参见这里：https://zhuanlan.zhihu.com/p/35134533，
+// 一个block的大小是32KB，可以放置一个、多个或是部分的slice。
 static const int kBlockSize = 32768;
 
+// 每个slice有7个字节的头部
 // Header is checksum (4 bytes), length (2 bytes), type (1 byte).
 static const int kHeaderSize = 4 + 2 + 1;
 

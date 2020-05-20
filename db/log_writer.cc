@@ -47,16 +47,18 @@ Status Writer::AddRecord(const Slice& slice) {
       // Switch to a new block
       if (leftover > 0) {
         // Fill the trailer (literal below relies on kHeaderSize being 7)
-        static_assert(kHeaderSize == 7, "");
+        static_assert(kHeaderSize == 7, ""); // 这行代码纯属多余
+        // 当前32k的block剩下不到7字节了，将尾部全部用0填充。
         dest_->Append(Slice("\x00\x00\x00\x00\x00\x00", leftover));
       }
-      block_offset_ = 0;
+      block_offset_ = 0; // 一个新的32字节的block开始了。
     }
 
     // Invariant: we never leave < kHeaderSize bytes in a block.
+    // 运行到这里肯定满足这个式子，只是为了确认一下没有bug
     assert(kBlockSize - block_offset_ - kHeaderSize >= 0);
 
-    const size_t avail = kBlockSize - block_offset_ - kHeaderSize;
+    const size_t avail = kBlockSize - block_offset_ - kHeaderSize; // avail意思是available
     const size_t fragment_length = (left < avail) ? left : avail;
 
     RecordType type;
@@ -81,24 +83,25 @@ Status Writer::AddRecord(const Slice& slice) {
 
 Status Writer::EmitPhysicalRecord(RecordType t, const char* ptr,
                                   size_t length) {
-  assert(length <= 0xffff);  // Must fit in two bytes
+  assert(length <= 0xffff);  // Must fit in two bytes，即65535
   assert(block_offset_ + kHeaderSize + length <= kBlockSize);
 
   // Format the header
   char buf[kHeaderSize];
-  buf[4] = static_cast<char>(length & 0xff);
+  buf[4] = static_cast<char>(length & 0xff); // 第五六个字节存储长度
   buf[5] = static_cast<char>(length >> 8);
-  buf[6] = static_cast<char>(t);
+  buf[6] = static_cast<char>(t); // 第七个字节存储type
 
+  // 最前面四个字节存储的是crc
   // Compute the crc of the record type and the payload.
   uint32_t crc = crc32c::Extend(type_crc_[t], ptr, length);
   crc = crc32c::Mask(crc);  // Adjust for storage
   EncodeFixed32(buf, crc);
 
   // Write the header and the payload
-  Status s = dest_->Append(Slice(buf, kHeaderSize));
+  Status s = dest_->Append(Slice(buf, kHeaderSize)); // 写入格式化好的头部
   if (s.ok()) {
-    s = dest_->Append(Slice(ptr, length));
+    s = dest_->Append(Slice(ptr, length)); // 写入数据
     if (s.ok()) {
       s = dest_->Flush();
     }

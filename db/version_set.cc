@@ -868,7 +868,7 @@ Status VersionSet::Recover(bool* save_manifest) {
   };
 
   // Read "CURRENT" file, which contains a pointer to the current manifest file
-  std::string current;
+  std::string current; // MANIFEST文件的名字，从CURRENT文件中读取
   Status s = ReadFileToString(env_, CurrentFileName(dbname_), &current);
   if (!s.ok()) {
     return s;
@@ -878,8 +878,9 @@ Status VersionSet::Recover(bool* save_manifest) {
   }
   current.resize(current.size() - 1);
 
-  std::string dscname = dbname_ + "/" + current;
-  SequentialFile* file;
+  //MANIFEST文件的路径+文件名，如dbtest/MANIFEST-000002
+  const std::string dscname = dbname_ + "/" + current; 
+  SequentialFile* file; // 打开文件MANIFEST
   s = env_->NewSequentialFile(dscname, &file);
   if (!s.ok()) {
     if (s.IsNotFound()) {
@@ -902,14 +903,16 @@ Status VersionSet::Recover(bool* save_manifest) {
   {
     LogReporter reporter;
     reporter.status = &s;
+    // 从MANIFEST中读取文件内容
     log::Reader reader(file, &reporter, true /*checksum*/,
                        0 /*initial_offset*/);
     Slice record;
-    std::string scratch;
+    std::string scratch; // scratch这个函数中并未用到，有啥用？
     while (reader.ReadRecord(&record, &scratch) && s.ok()) {
       VersionEdit edit;
       s = edit.DecodeFrom(record);
       if (s.ok()) {
+        // 检查comparator的名字，必须与manifest中记录的一样
         if (edit.has_comparator_ &&
             edit.comparator_ != icmp_.user_comparator()->Name()) {
           s = Status::InvalidArgument(

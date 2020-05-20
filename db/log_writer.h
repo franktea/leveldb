@@ -37,6 +37,7 @@ class Writer {
   Status AddRecord(const Slice& slice);
 
  private:
+  // 写入到文件dest_中去
   Status EmitPhysicalRecord(RecordType type, const char* ptr, size_t length);
 
   WritableFile* dest_;

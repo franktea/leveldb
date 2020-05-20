@@ -185,19 +185,22 @@ Status DBImpl::NewDB() {
   new_db.SetNextFile(2);
   new_db.SetLastSequence(0);
 
+  // 新建一个manifest文件，编号是000001
   const std::string manifest = DescriptorFileName(dbname_, 1);
   WritableFile* file;
   Status s = env_->NewWritableFile(manifest, &file);
   if (!s.ok()) {
-    return s;
+    return s; //这里return了后面的delete file就不执行了。严格的说可以算是内存泄露。
   }
   {
     log::Writer log(file);
     std::string record;
+    // 将db的信息写入到一个slice中。
     new_db.EncodeTo(&record);
+    // 将slice写入到manifest文件中。
     s = log.AddRecord(record);
     if (s.ok()) {
-      s = file->Close();
+      s = file->Close(); // file的析构函数里面会调用一次close。这里的close也是多余的。
     }
   }
   delete file;

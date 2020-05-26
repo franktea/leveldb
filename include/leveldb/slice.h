@@ -19,11 +19,39 @@
 #include <cstddef>
 #include <cstring>
 #include <string>
+#include <string_view>
 
 #include "leveldb/export.h"
 
 namespace leveldb {
 
+// Slice的功能其实和string_view一样，那就用string_view来实现吧。
+// 2020-05-26 修改了一下，很容易就成功了。
+class Slice : public std::string_view {
+public:
+  using std::string_view::string_view; // 继承所有的构造函数
+  
+  // 用const std::string& s作参数的构造函数是string_view没有的，单独实现
+  Slice(const std::string& s) : std::string_view(s.data(), s.size()) {}
+
+  std::string ToString() const { return std::string(data(), size()); }
+
+  // string_view没有clear()函数，很奇怪，自己实现一个吧。
+  void clear() { this->operator=(""); }
+
+  int compare(const Slice& b) const {
+    const size_t min_len = (size() < b.size()) ? size() : b.size();
+    int r = memcmp(data(), b.data(), min_len);
+    if (r == 0) {
+      if (size() < b.size())
+        r = -1;
+      else if (size() > b.size())
+        r = +1;
+    }
+    return r;
+  }
+};
+/*
 class LEVELDB_EXPORT Slice {
  public:
   // Create an empty slice.
@@ -108,7 +136,7 @@ inline int Slice::compare(const Slice& b) const {
   }
   return r;
 }
-
+*/
 }  // namespace leveldb
 
 #endif  // STORAGE_LEVELDB_INCLUDE_SLICE_H_

@@ -146,7 +146,7 @@ class RandomGenerator {
     return Slice(data_.data() + pos_ - len, len);
   }
 };
-
+/*
 static Slice TrimSpace(Slice s) {
   int start = 0;
   while (start < s.size() && isspace(s[start])) {
@@ -157,7 +157,7 @@ static Slice TrimSpace(Slice s) {
     limit--;
   }
   return Slice(s.data() + start, limit - start);
-}
+}*/
 
 }  // namespace
 

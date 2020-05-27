@@ -12,7 +12,7 @@
 namespace leveldb {
 
 TEST(FileNameTest, Parse) {
-  Slice db;
+  //Slice db;
   FileType type;
   uint64_t number;
 

@@ -27,7 +27,8 @@ namespace leveldb {
 
 // Slice的功能其实和string_view一样，那就用string_view来实现吧。
 // 2020-05-26 修改了一下，很容易就成功了。
-struct Slice : public std::string_view {
+class Slice : public std::string_view {
+public:
   using std::string_view::string_view; // 继承所有的构造函数
   
   // 用const std::string& s作参数的构造函数是string_view没有的，单独实现

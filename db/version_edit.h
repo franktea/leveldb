@@ -15,6 +15,7 @@ namespace leveldb {
 
 class VersionSet;
 
+// 对应ldb/sst文件
 struct FileMetaData {
   FileMetaData() : refs(0), allowed_seeks(1 << 30), file_size(0) {}
 
@@ -96,9 +97,10 @@ class VersionEdit {
   bool has_next_file_number_;
   bool has_last_sequence_;
 
-  std::vector<std::pair<int, InternalKey>> compact_pointers_;
-  DeletedFileSet deleted_files_;
-  std::vector<std::pair<int, FileMetaData>> new_files_;
+  // 所有的std::pair的first都是level
+  std::vector<std::pair<int, InternalKey>> compact_pointers_; // compact点(不是指针)
+  DeletedFileSet deleted_files_; // 删除的文件
+  std::vector<std::pair<int, FileMetaData>> new_files_; // 新文件
 };
 
 }  // namespace leveldb

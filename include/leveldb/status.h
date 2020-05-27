@@ -21,6 +21,8 @@
 
 namespace leveldb {
 
+// Status是将长度、code和message打包成一个char[]，
+// 这样Status的拷贝大小就是一个指针的大小了，作为返回值时更小。
 class LEVELDB_EXPORT Status {
  public:
   // Create a success status.

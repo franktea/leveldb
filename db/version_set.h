@@ -154,12 +154,14 @@ class Version {
   std::vector<FileMetaData*> files_[config::kNumLevels];
 
   // Next file to compact based on seek stats.
+  // 下一个要compact的文件
   FileMetaData* file_to_compact_;
-  int file_to_compact_level_;
+  int file_to_compact_level_; 
 
   // Level that should be compacted next and its compaction score.
   // Score < 1 means compaction is not strictly needed.  These fields
   // are initialized by Finalize().
+  // 下一个需要compact的leve和score。score<1说明compaction并不紧迫，这两个字段在Finalize()中初始化
   double compaction_score_;
   int compaction_level_;
 };
@@ -293,25 +295,30 @@ class VersionSet {
 
   void AppendVersion(Version* v);
 
+  // 从构造函数传入进行初始化的与db相关的成员
   Env* const env_;
   const std::string dbname_;
   const Options* const options_;
   TableCache* const table_cache_;
   const InternalKeyComparator icmp_;
-  uint64_t next_file_number_;
-  uint64_t manifest_file_number_;
+  
+  // db元信息相关
+  uint64_t next_file_number_; // log文件编号
+  uint64_t manifest_file_number_; // manifest文件编号
   uint64_t last_sequence_;
-  uint64_t log_number_;
+  uint64_t log_number_; // log编号
   uint64_t prev_log_number_;  // 0 or backing store for memtable being compacted
 
-  // Opened lazily
+  // Opened lazily，manifest相关
   WritableFile* descriptor_file_;
   log::Writer* descriptor_log_;
+  // 循环双向链表的头结点
   Version dummy_versions_;  // Head of circular doubly-linked list of versions.
   Version* current_;        // == dummy_versions_.prev_
 
   // Per-level key at which the next compaction at that level should start.
   // Either an empty string, or a valid InternalKey.
+  // 每个level下一次compacttion开始的key，要么为空的string，要么为一个合法的InternalKey
   std::string compact_pointer_[config::kNumLevels];
 };
 

@@ -78,7 +78,7 @@ class MemTable {
   ~MemTable();  // Private since only Unref() should be used to delete it
 
   KeyComparator comparator_;
-  int refs_;
+  int refs_; // 当前MemTable的引用计数
   Arena arena_;
   Table table_;
 };

@@ -15,12 +15,13 @@ namespace leveldb {
 
 class VersionSet;
 
+// sstable文件前面为数据，后面为元信息。元信息被封装成下面的FileMetaData类。
 // 对应ldb/sst文件
 struct FileMetaData {
   FileMetaData() : refs(0), allowed_seeks(1 << 30), file_size(0) {}
 
   int refs; // 引用计数，为0时会被delete掉
-  int allowed_seeks;  // Seeks allowed until compaction
+  int allowed_seeks;  // Seeks allowed until compaction，compact 之前允许的 seek 次数
   uint64_t number;  // number是文件的编号，全局递增，通过number就可以找到一个sst文件（dbname/[0-9]+.(sst|ldb)）
   uint64_t file_size;    // File size in bytes
   InternalKey smallest;  // Smallest internal key served by table

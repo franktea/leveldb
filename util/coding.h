@@ -13,6 +13,8 @@
 #include <cstdint>
 #include <cstring>
 #include <string>
+#include <array>
+#include <type_traits>
 
 #include "leveldb/slice.h"
 #include "port/port.h"
@@ -48,21 +50,33 @@ int VarintLength(uint64_t v);
 char* EncodeVarint32(char* dst, uint32_t value);
 char* EncodeVarint64(char* dst, uint64_t value);
 
+// 自己写一个模板函数，将EncodeFixed32和EncodeFixed64统一起来。
+template<class T>
+inline void EncodeFixedInt(char* dst, T value) {
+  *(T*)dst = value; // 对于小端直接拷贝过来
+  if(std::endian::native == std::endian::big) { // 大端需要转字节序
+    auto const buffer = reinterpret_cast<std::array<uint8_t, sizeof(T)>*>(dst);
+    std::reverse(buffer->begin(), buffer->end());
+  }
+}
+
 // Lower-level versions of Put... that write directly into a character buffer
 // REQUIRES: dst has enough space for the value being written
 
 inline void EncodeFixed32(char* dst, uint32_t value) {
-  uint8_t* const buffer = reinterpret_cast<uint8_t*>(dst);
+  EncodeFixedInt(dst, value);
+/*  uint8_t* const buffer = reinterpret_cast<uint8_t*>(dst);
 
   // Recent clang and gcc optimize this to a single mov / str instruction.
   buffer[0] = static_cast<uint8_t>(value);
   buffer[1] = static_cast<uint8_t>(value >> 8);
   buffer[2] = static_cast<uint8_t>(value >> 16);
-  buffer[3] = static_cast<uint8_t>(value >> 24);
+  buffer[3] = static_cast<uint8_t>(value >> 24);*/
 }
 
 inline void EncodeFixed64(char* dst, uint64_t value) {
-  uint8_t* const buffer = reinterpret_cast<uint8_t*>(dst);
+  EncodeFixedInt(dst, value);
+  /*uint8_t* const buffer = reinterpret_cast<uint8_t*>(dst);
 
   // Recent clang and gcc optimize this to a single mov / str instruction.
   buffer[0] = static_cast<uint8_t>(value);
@@ -72,7 +86,7 @@ inline void EncodeFixed64(char* dst, uint64_t value) {
   buffer[4] = static_cast<uint8_t>(value >> 32);
   buffer[5] = static_cast<uint8_t>(value >> 40);
   buffer[6] = static_cast<uint8_t>(value >> 48);
-  buffer[7] = static_cast<uint8_t>(value >> 56);
+  buffer[7] = static_cast<uint8_t>(value >> 56);*/
 }
 
 // Lower-level versions of Get... that read directly from a character buffer

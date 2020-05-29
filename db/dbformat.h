@@ -21,16 +21,20 @@ namespace leveldb {
 
 // Grouping of constants.  We may want to make some of these
 // parameters set via options.
+// 一些编译器的常量
 namespace config {
-static const int kNumLevels = 7;
+static const int kNumLevels = 7; // 最多的level只能为7层(0~6)
 
 // Level-0 compaction is started when we hit this many files.
+// level 0中的文件数量超过4个，就执行compact
 static const int kL0_CompactionTrigger = 4;
 
 // Soft limit on number of level-0 files.  We slow down writes at this point.
+// level-0 中 sstable 的数量超过8个, 慢处理此次写(sleep 1ms)
 static const int kL0_SlowdownWritesTrigger = 8;
 
 // Maximum number of level-0 files.  We stop writes at this point.
+// level-0 中 sstable 的数量超过12个, 阻塞至 compact memtable 完成。
 static const int kL0_StopWritesTrigger = 12;
 
 // Maximum level to which a new compacted memtable is pushed if it
@@ -51,6 +55,9 @@ class InternalKey;
 // Value types encoded as the last component of internal keys.
 // DO NOT CHANGE THESE ENUM VALUES: they are embedded in the on-disk
 // data structures.
+// leveldb更新(put/delete)某个key时不会操控到db中的数据，每次操作都是直接插入一份新的key-value数据，
+// 具体的数据合并和清除由后台的compact完成。即使该key已经存在，也会插入一条新的数据。
+// delete数据等于插入一条value为空的数据，由kTypeDeletion来标识。
 enum ValueType { kTypeDeletion = 0x0, kTypeValue = 0x1 };
 // kValueTypeForSeek defines the ValueType that should be passed when
 // constructing a ParsedInternalKey object for seeking to a particular
@@ -65,6 +72,7 @@ typedef uint64_t SequenceNumber;
 // We leave eight bits empty at the bottom so a type and sequence#
 // can be packed together into 64-bits.
 // 从右到左连续的56个1（不是55个）
+// 存储时，SequenceNumber占56个bit，ValueType占8个bit，2者共占64bit。
 static const SequenceNumber kMaxSequenceNumber = ((0x1ull << 56) - 1);
 
 struct ParsedInternalKey {
@@ -100,6 +108,9 @@ inline Slice ExtractUserKey(const Slice& internal_key) {
 
 // A comparator for internal keys that uses a specified comparator for
 // the user key portion and breaks ties by decreasing sequence number.
+// 内部key排序的比较。先用user-comparator比较user-key，如果user-key相同，
+// 就继续比较SequnceNumber，SequnceNumber大的为小。因为SequnceNumber在db中是全局递增的，
+// 所以对于相同的user-key，最新的更新(SequnceNumber更大的)排在前面，在查找的时候会被先找到。
 class InternalKeyComparator : public Comparator {
  private:
   const Comparator* user_comparator_;
@@ -132,6 +143,7 @@ class InternalFilterPolicy : public FilterPolicy {
 // Modules in this directory should keep internal keys wrapped inside
 // the following class instead of plain strings so that we do not
 // incorrectly use string comparisons instead of an InternalKeyComparator.
+// db内部操作的key。是将user_key加上SequenceNumber和ValueType
 class InternalKey {
  private:
   std::string rep_;
@@ -182,6 +194,8 @@ inline bool ParseInternalKey(const Slice& internal_key,
 }
 
 // A helper class useful for DBImpl::Get()
+// db内部在查找memtable/sstable时使用的key结构，保存有user key/sequnce number/value type
+// dump在内存中的数据.
 class LookupKey {
  public:
   // Initialize *this for looking up user_key at a snapshot with
@@ -206,12 +220,12 @@ class LookupKey {
   // We construct a char array of the form:
   //    klength  varint32               <-- start_
   //    userkey  char[klength]          <-- kstart_
-  //    tag      uint64
+  //    tag      uint64    // 保存SequnceNumber/ValueType打包后的数据，保存SequnceNumber占56bit，ValueType占8bit。
   //                                    <-- end_
   // The array is a suitable MemTable key.
   // The suffix starting with "userkey" can be used as an InternalKey.
-  const char* start_;
-  const char* kstart_;
+  const char* start_; // 指向length of UserKey，为varint32格式。
+  const char* kstart_; // 指向UserKey data, 长度为UserKey Length
   const char* end_;
   char space_[200];  // Avoid allocation for short keys
 };

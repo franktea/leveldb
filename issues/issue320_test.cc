@@ -53,6 +53,8 @@ TEST(Issue320, Test) {
   options.create_if_missing = true;
 
   std::string dbpath = testing::TempDir() + "leveldb_issue320_test";
+  // 突然出现打开数据是失败，我把文件路径打出来，将该目录删除就跑过了，
+  //std::cout<<"dbpath: "<<dbpath<<"\n"; 
   ASSERT_LEVELDB_OK(DB::Open(options, dbpath, &db));
 
   uint32_t target_size = 10000;

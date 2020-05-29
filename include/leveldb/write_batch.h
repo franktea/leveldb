@@ -30,6 +30,13 @@ namespace leveldb {
 
 class Slice;
 
+// 对若干数目的key的write(put和delete)封装成WriteBatch。它会将userkey以及SequenceNumber和ValueType先做
+// encode，然后decode将数据insert到指定的Handler(memtable)里面。encode-decode似乎多余。
+// WriteBatch在encode以后的格式为：
+// SequenceNumber(uint64) | count(uint32) | record0 | ...... | recordN
+// record格式为
+// ValueType(char) | key_len(varint32) | key_data(key_len) | value_len(varint32) | value_data(value_len)
+// 对于kTypeDeletion，只有key没有value。
 class LEVELDB_EXPORT WriteBatch {
  public:
   class LEVELDB_EXPORT Handler {

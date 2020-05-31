@@ -14,6 +14,7 @@
 
 namespace leveldb {
 
+// 将iter指向的数据写入到文件中。
 Status BuildTable(const std::string& dbname, Env* env, const Options& options,
                   TableCache* table_cache, Iterator* iter, FileMetaData* meta) {
   Status s;
@@ -37,7 +38,7 @@ Status BuildTable(const std::string& dbname, Env* env, const Options& options,
     }
 
     // Finish and check for builder errors
-    s = builder->Finish();
+    s = builder->Finish(); // 写入meta index block、index block、footer
     if (s.ok()) {
       meta->file_size = builder->FileSize();
       assert(meta->file_size > 0);

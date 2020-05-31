@@ -660,6 +660,7 @@ void DBImpl::RecordBackgroundError(const Status& s) {
 void DBImpl::MaybeScheduleCompaction() {
   mutex_.AssertHeld();
   if (background_compaction_scheduled_) {
+    // 确保只有一个后台线程在compact
     // Already scheduled
   } else if (shutting_down_.load(std::memory_order_acquire)) {
     // DB is being deleted; no more background compactions
@@ -670,6 +671,8 @@ void DBImpl::MaybeScheduleCompaction() {
     // No work to be done
   } else {
     background_compaction_scheduled_ = true;
+    // 启动compact线程。
+    // compact的逻辑在DBImpl::BackgroundCompaction()实现
     env_->Schedule(&DBImpl::BGWork, this);
   }
 }

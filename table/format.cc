@@ -113,7 +113,7 @@ Status ReadBlock(RandomAccessFile* file, const ReadOptions& options,
         result->heap_allocated = false;
         result->cachable = false;  // Do not double-cache
       } else {
-        // 只有这一处不能释放内存，调用release()
+        // 只有这一处不能释放内存，调用unique_ptr.release()
         buf_ptr.release();
         result->data = Slice(buf, n);
         result->heap_allocated = true;

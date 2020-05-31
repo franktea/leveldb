@@ -1,0 +1,11 @@
+{
+    "git.ignoreLimitWarning": true,
+    "files.associations": {
+        "string": "cpp",
+        "atomic": "cpp",
+        "iosfwd": "cpp",
+        "vector": "cpp",
+        "utility": "cpp"
+    },
+    "C_Cpp.default.configurationProvider": "${default}"
+}

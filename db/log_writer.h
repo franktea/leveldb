@@ -41,6 +41,7 @@ class Writer {
   Status EmitPhysicalRecord(RecordType type, const char* ptr, size_t length);
 
   WritableFile* dest_;
+  // 一个block可能装多个record，offset用来记录当前的block消耗了多少字节，每次写入新数据都从offset开始
   int block_offset_;  // Current offset in block
 
   // crc32c values for all supported record types.  These are

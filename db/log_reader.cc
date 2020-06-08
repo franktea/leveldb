@@ -30,15 +30,19 @@ Reader::Reader(SequentialFile* file, Reporter* reporter, bool checksum,
 
 Reader::~Reader() { delete[] backing_store_; }
 
+// 从大于等于initial_offset_字节的地方开始读取。
+// initial_offset_是从构造函数传进来的。
 bool Reader::SkipToInitialBlock() {
-  const size_t offset_in_block = initial_offset_ % kBlockSize;
-  uint64_t block_start_location = initial_offset_ - offset_in_block;
+  // 每个block是32字节固定的
+  const size_t offset_in_block = initial_offset_ % kBlockSize; // 取余，与block不对齐的地方
+  uint64_t block_start_location = initial_offset_ - offset_in_block; // 
 
   // Don't search a block if we'd be in the trailer
-  if (offset_in_block > kBlockSize - 6) {
+  if (offset_in_block > kBlockSize - 6) { //如果是在最后的6字节之内，没有读的必要，因为都是用0填充的
     block_start_location += kBlockSize;
   }
 
+  // 注意end_of_buffer_offset的设置是块的开始地址。
   end_of_buffer_offset_ = block_start_location;
 
   // Skip to start of first block that can contain the initial record
@@ -62,13 +66,14 @@ bool Reader::ReadRecord(Slice* record, std::string* scratch) {
 
   scratch->clear();
   record->clear();
-  bool in_fragmented_record = false;
+  bool in_fragmented_record = false; // 是否尚在读取一个被切分成多块的record
   // Record offset of the logical record that we're reading
   // 0 is a dummy value to make compilers happy
   uint64_t prospective_record_offset = 0;
 
   Slice fragment;
   while (true) {
+    // 读取一个物理的record，未必是一个完整的slice。
     const unsigned int record_type = ReadPhysicalRecord(&fragment);
 
     // ReadPhysicalRecord may have only had an empty trailer remaining in its
@@ -188,12 +193,15 @@ void Reader::ReportDrop(uint64_t bytes, const Status& reason) {
 
 unsigned int Reader::ReadPhysicalRecord(Slice* result) {
   while (true) {
-    if (buffer_.size() < kHeaderSize) {
-      if (!eof_) {
+    if (buffer_.size() < kHeaderSize) { // buffer不到kHeaderSize（即7字节）的大小
+      if (!eof_) { // 如果未遇到结束
+        // 上一次的读是一个完整的读，?????
         // Last read was a full read, so this is a trailer to skip
-        buffer_.clear();
+        buffer_.clear(); // 清空缓存区
+        // 读取kBlockSize即32KB到buffer_里面，最后一个参数在这里没什么卵用
         Status status = file_->Read(kBlockSize, &buffer_, backing_store_);
         end_of_buffer_offset_ += buffer_.size();
+        
         if (!status.ok()) {
           buffer_.clear();
           ReportDrop(kBlockSize, status);
@@ -204,6 +212,9 @@ unsigned int Reader::ReadPhysicalRecord(Slice* result) {
         }
         continue;
       } else {
+        // 注意：如果buffer_是非空的，我们有一个truncated header在文件的尾巴，
+        // 这可能是由于在写入header的时候crash导致的，
+        // 与其把这个失败的写入当成错误来处理，还不如直接当成EOF呢。
         // Note that if buffer_ is non-empty, we have a truncated header at the
         // end of the file, which can be caused by the writer crashing in the
         // middle of writing the header. Instead of considering this an error,
@@ -214,11 +225,13 @@ unsigned int Reader::ReadPhysicalRecord(Slice* result) {
     }
 
     // Parse the header
+    // 解析头部，应该封成一个函数比较好
     const char* header = buffer_.data();
     const uint32_t a = static_cast<uint32_t>(header[4]) & 0xff;
     const uint32_t b = static_cast<uint32_t>(header[5]) & 0xff;
     const unsigned int type = header[6];
     const uint32_t length = a | (b << 8);
+    // 头部记录的数据大于buffer实际长度，数据有误
     if (kHeaderSize + length > buffer_.size()) {
       size_t drop_size = buffer_.size();
       buffer_.clear();
@@ -256,6 +269,7 @@ unsigned int Reader::ReadPhysicalRecord(Slice* result) {
       }
     }
 
+    // 移除头部
     buffer_.remove_prefix(kHeaderSize + length);
 
     // Skip physical record that started before initial_offset_

@@ -17,6 +17,7 @@ class SequentialFile;
 
 namespace log {
 
+// 日志文件的读取类，和log_writer文件的写功能对应
 class Reader {
  public:
   // Interface for reporting errors.
@@ -98,12 +99,16 @@ class Reader {
   uint64_t end_of_buffer_offset_;
 
   // Offset at which to start looking for the first record to return
+  // 这个initial_offset_在leveldb里面传的都是0，只有在test的时候才用了非0的用法。
+  // initial_offset_把代码的可读性变得更复杂，据说是来自bigtable的东东。
+  // 如果为了理解简单，只要知道它在leveldb中一定是0即可。
   uint64_t const initial_offset_;
 
   // True if we are resynchronizing after a seek (initial_offset_ > 0). In
   // particular, a run of kMiddleType and kLastType records can be silently
   // skipped in this mode
-  bool resyncing_;
+  // 这个单词啥意思没搞懂，具体的作用也未弄明白
+  bool resyncing_; // 值在构造函数中设定：resyncing_(initial_offset > 0)
 };
 
 }  // namespace log

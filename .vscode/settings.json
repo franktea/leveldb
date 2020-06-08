@@ -5,7 +5,8 @@
         "atomic": "cpp",
         "iosfwd": "cpp",
         "vector": "cpp",
-        "utility": "cpp"
+        "utility": "cpp",
+        "string_view": "cpp"
     },
     "C_Cpp.default.configurationProvider": "${default}"
 }

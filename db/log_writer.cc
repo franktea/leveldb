@@ -49,6 +49,8 @@ Status Writer::AddRecord(const Slice& slice) {
         // Fill the trailer (literal below relies on kHeaderSize being 7)
         static_assert(kHeaderSize == 7, ""); // 这行代码纯属多余
         // 当前32k的block剩下不到7字节了，将尾部全部用0填充。
+        // 如果剩余刚好是7个字节，也是全部填充0，相当于一个没用的头部，因为长度是0，
+        // 也就是说，下一个block开始的时候，还要重新写一个头部。
         dest_->Append(Slice("\x00\x00\x00\x00\x00\x00", leftover));
       }
       block_offset_ = 0; // 一个新的32字节的block开始了。
@@ -73,6 +75,8 @@ Status Writer::AddRecord(const Slice& slice) {
       type = kMiddleType;
     }
 
+    // 将当前的record写入到硬盘里面去，到此可能连一个slice都还没写完，
+    // 所以写入硬盘不是以block为单位的
     s = EmitPhysicalRecord(type, ptr, fragment_length);
     ptr += fragment_length;
     left -= fragment_length;
@@ -81,6 +85,7 @@ Status Writer::AddRecord(const Slice& slice) {
   return s;
 }
 
+// 将一个record写入到文件里面去，这个record可能只是一个slice的一部分
 Status Writer::EmitPhysicalRecord(RecordType t, const char* ptr,
                                   size_t length) {
   assert(length <= 0xffff);  // Must fit in two bytes，即65535
@@ -106,6 +111,8 @@ Status Writer::EmitPhysicalRecord(RecordType t, const char* ptr,
       s = dest_->Flush();
     }
   }
+
+  // 当前的block里面将写入的位置往前移，下次从这里开始写
   block_offset_ += kHeaderSize + length;
   return s;
 }

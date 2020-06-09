@@ -58,6 +58,8 @@ bool Reader::SkipToInitialBlock() {
 }
 
 bool Reader::ReadRecord(Slice* record, std::string* scratch) {
+  // last_record_offset_一开始是0，按照resyncing_的意思，应该用
+  // if(resyncing_)来判断
   if (last_record_offset_ < initial_offset_) {
     if (!SkipToInitialBlock()) {
       return false;
@@ -73,12 +75,16 @@ bool Reader::ReadRecord(Slice* record, std::string* scratch) {
 
   Slice fragment;
   while (true) {
-    // 读取一个物理的record，未必是一个完整的slice。
+    // 读取一个物理的record，未必是一个完整的slice，因为一个record可能会被分成多个record。
     const unsigned int record_type = ReadPhysicalRecord(&fragment);
 
     // ReadPhysicalRecord may have only had an empty trailer remaining in its
     // internal buffer. Calculate the offset of the next physical record now
     // that it has returned, properly accounting for its header size.
+    // end_of_buffer_offset_是文件的当前指针。
+    // buffer_.size()得到的是当前读出来的block未被解析完的字节数，
+    // physical_record_offset是当前读取到的record在文件中的其实位置。
+    // 用这么复杂的算式算出来，还不如用一个变量上一次读取的时间记下来。
     uint64_t physical_record_offset =
         end_of_buffer_offset_ - buffer_.size() - kHeaderSize - fragment.size();
 
@@ -191,6 +197,11 @@ void Reader::ReportDrop(uint64_t bytes, const Status& reason) {
   }
 }
 
+// 从文件中读取一个record，将数据解析出来存入到Slice* result中去。
+// 每次读取一个block，读出来以后存入到buffer_中，然后解析成一个一个的slice。
+// 解析完当前block以后再读取下一个block。
+// 所以并不是每次调用此函数都会触发读取文件。
+// 只有当缓存在buffer_中的数据解析完了才会从文件中读取下一个block。
 unsigned int Reader::ReadPhysicalRecord(Slice* result) {
   while (true) {
     if (buffer_.size() < kHeaderSize) { // buffer不到kHeaderSize（即7字节）的大小
@@ -199,6 +210,7 @@ unsigned int Reader::ReadPhysicalRecord(Slice* result) {
         // Last read was a full read, so this is a trailer to skip
         buffer_.clear(); // 清空缓存区
         // 读取kBlockSize即32KB到buffer_里面，最后一个参数在这里没什么卵用
+        // buffer_可能可以解析成多个block，在解析完之前不会再次调用Read函数读取文件。
         Status status = file_->Read(kBlockSize, &buffer_, backing_store_);
         end_of_buffer_offset_ += buffer_.size();
         
@@ -211,7 +223,7 @@ unsigned int Reader::ReadPhysicalRecord(Slice* result) {
           eof_ = true;
         }
         continue;
-      } else {
+      } else { // 文件结尾了
         // 注意：如果buffer_是非空的，我们有一个truncated header在文件的尾巴，
         // 这可能是由于在写入header的时候crash导致的，
         // 与其把这个失败的写入当成错误来处理，还不如直接当成EOF呢。
@@ -269,7 +281,8 @@ unsigned int Reader::ReadPhysicalRecord(Slice* result) {
       }
     }
 
-    // 移除头部
+    // 当前的一个record解析完了，将buffer_缓存的数据移动到下一个record的起始位置，
+    // 下一次解析的时候就直接得到下一个record
     buffer_.remove_prefix(kHeaderSize + length);
 
     // Skip physical record that started before initial_offset_

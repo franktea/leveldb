@@ -90,12 +90,13 @@ class Reader {
   Reporter* const reporter_;
   bool const checksum_;
   char* const backing_store_;
-  Slice buffer_;
+  Slice buffer_; // 从文件中每次固定读取一个block的长度（32KB），读到的内容存放在buffer_中（读到的长度小于等于32k），然后解析成一个一个的record
   bool eof_;  // Last Read() indicated EOF by returning < kBlockSize
 
   // Offset of the last record returned by ReadRecord.
   uint64_t last_record_offset_;
   // Offset of the first location past the end of buffer_.
+  // end_of_buffer_offset_记录文件指针当前的位置。
   uint64_t end_of_buffer_offset_;
 
   // Offset at which to start looking for the first record to return
@@ -107,7 +108,9 @@ class Reader {
   // True if we are resynchronizing after a seek (initial_offset_ > 0). In
   // particular, a run of kMiddleType and kLastType records can be silently
   // skipped in this mode
-  // 这个单词啥意思没搞懂，具体的作用也未弄明白
+  // 如果需要跳过一些内容，这个变量的值就为true，否则为false。
+  // 如果传入的initial_offset > 0，则初始化为true，在第一次跳过以后设置为false。
+  // 这个变量用来记录下一次是否需要跳过initial_offset_，因为最多只需要跳过一次。
   bool resyncing_; // 值在构造函数中设定：resyncing_(initial_offset > 0)
 };
 

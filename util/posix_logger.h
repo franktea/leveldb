@@ -21,6 +21,7 @@
 
 namespace leveldb {
 
+// 写info log，就是名字叫LOG的文件
 class PosixLogger final : public Logger {
  public:
   // Creates a logger that writes to the given file.

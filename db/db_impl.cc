@@ -91,28 +91,39 @@ static void ClipToRange(T* ptr, V minvalue, V maxvalue) {
   if (static_cast<V>(*ptr) > maxvalue) *ptr = maxvalue;
   if (static_cast<V>(*ptr) < minvalue) *ptr = minvalue;
 }
+// 修改option里面的一些参数设定，包括：
+// 参数范围、info_log、block_cache
 Options SanitizeOptions(const std::string& dbname,
                         const InternalKeyComparator* icmp,
                         const InternalFilterPolicy* ipolicy,
                         const Options& src) {
-  Options result = src;
+  Options result = src; // 将传进来的option复制一份再修改然后作为返回值返回
   result.comparator = icmp;
   result.filter_policy = (src.filter_policy != nullptr) ? ipolicy : nullptr;
+  // 修改一大堆参数的范围，使其在某个区间内
   ClipToRange(&result.max_open_files, 64 + kNumNonTableCacheFiles, 50000);
   ClipToRange(&result.write_buffer_size, 64 << 10, 1 << 30);
   ClipToRange(&result.max_file_size, 1 << 20, 1 << 30);
-  ClipToRange(&result.block_size, 1 << 10, 4 << 20);
+  ClipToRange(&result.block_size, 1 << 10, 4 << 20); 
+  // info_log就是名字叫LOG的文件
   if (result.info_log == nullptr) {
     // Open a log file in the same directory as the db
     src.env->CreateDir(dbname);  // In case it does not exist
+    // 将原来的LOG文件重命名为LOG.old
     src.env->RenameFile(InfoLogFileName(dbname), OldInfoLogFileName(dbname));
+    // 创建一个新的LOG文件
     Status s = src.env->NewLogger(InfoLogFileName(dbname), &result.info_log);
     if (!s.ok()) {
       // No place suitable for logging
       result.info_log = nullptr;
     }
   }
+
+  // block cache是用来存放sst文件里面的block数据部分，
+  // table cache是用来存放sst文件里面的index cache部分。
+  // 此处只设置了block cache，table_cache_在DBImpl的构造函数中设定
   if (result.block_cache == nullptr) {
+    // 缓存容量8192K个
     result.block_cache = NewLRUCache(8 << 20);
   }
   return result;
@@ -135,10 +146,14 @@ DBImpl::DBImpl(const Options& raw_options, const std::string& dbname)
       table_cache_(new TableCache(dbname_, options_, TableCacheSize(options_))),
       db_lock_(nullptr),
       shutting_down_(false),
+      // 后台线程信号量
       background_work_finished_signal_(&mutex_),
+      // 当前活跃的MemTable
       mem_(nullptr),
+      // 只读的MemTable
       imm_(nullptr),
       has_imm_(false),
+      // binlog文件，类似于FILE的指针
       logfile_(nullptr),
       logfile_number_(0),
       log_(nullptr),

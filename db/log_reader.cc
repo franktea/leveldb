@@ -85,7 +85,7 @@ bool Reader::ReadRecord(Slice* record, std::string* scratch) {
     // buffer_.size()得到的是当前读出来的block未被解析完的字节数，
     // physical_record_offset是当前读取到的record在文件中的其实位置。
     // 用这么复杂的算式算出来，还不如用一个变量上一次读取的时间记下来。
-    uint64_t physical_record_offset =
+    const uint64_t physical_record_offset =
         end_of_buffer_offset_ - buffer_.size() - kHeaderSize - fragment.size();
 
     if (resyncing_) {

@@ -205,7 +205,7 @@ Status DBImpl::NewDB() {
   WritableFile* file;
   Status s = env_->NewWritableFile(manifest, &file);
   if (!s.ok()) {
-    return s; //这里return了后面的delete file就不执行了。严格的说可以算是内存泄露。
+    return s; //这里return了后面的delete file就不执行了。严格的说可以算是资源泄露。
   }
   {
     log::Writer log(file);
@@ -334,6 +334,7 @@ Status DBImpl::Recover(VersionEdit* edit, bool* save_manifest) {
     }
   }
 
+  // 从manifest中读取versions信息
   s = versions_->Recover(save_manifest);
   if (!s.ok()) {
     return s;
@@ -349,12 +350,12 @@ Status DBImpl::Recover(VersionEdit* edit, bool* save_manifest) {
   // produced by an older version of leveldb.
   const uint64_t min_log = versions_->LogNumber();
   const uint64_t prev_log = versions_->PrevLogNumber();
-  std::vector<std::string> filenames;
+  std::vector<std::string> filenames; // 读取当前db目录下面全部的文件名
   s = env_->GetChildren(dbname_, &filenames);
   if (!s.ok()) {
     return s;
   }
-  std::set<uint64_t> expected;
+  std::set<uint64_t> expected; // 所有level下面的全部的文件名number，如008347.ldb对应的number是8347
   versions_->AddLiveFiles(&expected);
   uint64_t number;
   FileType type;
@@ -374,6 +375,7 @@ Status DBImpl::Recover(VersionEdit* edit, bool* save_manifest) {
   }
 
   // Recover in the order in which the logs were generated
+  // 看起来可能同时存在多个*.log文件？
   std::sort(logs.begin(), logs.end());
   for (size_t i = 0; i < logs.size(); i++) {
     s = RecoverLogFile(logs[i], (i == logs.size() - 1), save_manifest, edit,

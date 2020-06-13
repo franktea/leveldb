@@ -566,6 +566,12 @@ std::string Version::DebugString() const {
 // A helper class so we can efficiently apply a whole sequence
 // of edits to a particular state without creating intermediate
 // Versions that contain full copies of the intermediate state.
+// 这篇文章对Builder讲述得很清楚：https://zhuanlan.zhihu.com/p/44584617
+// 在LevelDB中，加号则是由VersionSet::Builder来伴演的。也就是说，
+// 一个正常的表达式是： A + B = C。如果要用LevelDB的语言来描述，
+// 那么就会变成Version (+VersionSet::Builder) + VersionEdit = Version。
+// 加法是通过Builder::Apply实现的，等于号是通过Builder::SaveTo实现的。
+// 用重载加号运算符的方法实现加法是不是更加容易理解？
 class VersionSet::Builder {
  private:
   // Helper to sort by v->files_[file_number].smallest
@@ -628,6 +634,8 @@ class VersionSet::Builder {
   // Apply all of the edits in *edit to the current state.
   void Apply(VersionEdit* edit) {
     // Update compaction pointers
+    // compact_pointers_里面保存的是每个level下一次compacttion开始的key，
+    // 要么为空的string，要么为一个合法的InternalKey
     for (size_t i = 0; i < edit->compact_pointers_.size(); i++) {
       const int level = edit->compact_pointers_[i].first;
       vset_->compact_pointer_[level] =
@@ -660,9 +668,12 @@ class VersionSet::Builder {
       // same as the compaction of 40KB of data.  We are a little
       // conservative and allow approximately one seek for every 16KB
       // of data before triggering a compaction.
+      // 这意味着25次搜寻的成本与压缩1MB数据相同。 即，一次搜寻的费用与压缩40KB数据大致相同。 
+      // 保守一点，在触发压缩之前，每16KB数据大约允许查找一次。
       f->allowed_seeks = static_cast<int>((f->file_size / 16384U));
       if (f->allowed_seeks < 100) f->allowed_seeks = 100;
 
+      // 为了防止在deleted_files里面有这个number(真的会有么？)，在deleted_files里面删掉这个number
       levels_[level].deleted_files.erase(f->number);
       levels_[level].added_files->insert(f);
     }
@@ -675,10 +686,30 @@ class VersionSet::Builder {
     for (int level = 0; level < config::kNumLevels; level++) {
       // Merge the set of added files with the set of pre-existing files.
       // Drop any deleted files.  Store the result in *v.
+      // 将一个排序的vector和一个set的内容合并到另一个vector里面去，且仍然保持有序。
+      // 感觉写得比较复杂。自己实现一个看看，自己理解起来更简单，代码确实也更短。
+      auto it1 = base_->files_[level].begin();
+      auto it1_end = base_->files_[level].end();
+      auto it2 = levels_[level].added_files->begin();
+      auto it2_end = levels_[level].added_files->end();
+      // 从两个排序的容器中依次取当前较小的
+      while(it1 != it1_end || it2 != it2_end) {
+        FileMetaData* pf = (it1 != it1_end) ? *it1 : nullptr;
+
+        if(it2 != it2_end && (!pf || cmp(*it2, pf))) {
+          pf = *it2++;
+        } else {
+          ++it1;
+        }
+
+        MaybeAddFile(v, level, pf);
+      }
+      // 之前的老代码
+      /*
       const std::vector<FileMetaData*>& base_files = base_->files_[level];
       std::vector<FileMetaData*>::const_iterator base_iter = base_files.begin();
       std::vector<FileMetaData*>::const_iterator base_end = base_files.end();
-      const FileSet* added_files = levels_[level].added_files;
+      const FileSet* added_files = levels_[level].added_files; // 这个类型是std::set，是有序的
       v->files_[level].reserve(base_files.size() + added_files->size());
       for (const auto& added_file : *added_files) {
         // Add all smaller files listed in base_
@@ -694,7 +725,7 @@ class VersionSet::Builder {
       // Add remaining base files
       for (; base_iter != base_end; ++base_iter) {
         MaybeAddFile(v, level, *base_iter);
-      }
+      }*/
 
 #ifndef NDEBUG
       // Make sure there is no overlap in levels > 0
@@ -714,6 +745,7 @@ class VersionSet::Builder {
     }
   }
 
+  // 看一下f是否在删除列表里面，如果不在，就添加到v的MetaData文列表中
   void MaybeAddFile(Version* v, int level, FileMetaData* f) {
     if (levels_[level].deleted_files.count(f->number) > 0) {
       // File is deleted: do nothing
@@ -721,6 +753,7 @@ class VersionSet::Builder {
       std::vector<FileMetaData*>* files = &v->files_[level];
       if (level > 0 && !files->empty()) {
         // Must not overlap
+        // 当前文件最小的key必须比上一个文件最大的key要大
         assert(vset_->icmp_.Compare((*files)[files->size() - 1]->largest,
                                     f->smallest) < 0);
       }
@@ -768,6 +801,7 @@ void VersionSet::AppendVersion(Version* v) {
   v->Ref();
 
   // Append to linked list
+  // 将v添加到链表的末尾
   v->prev_ = dummy_versions_.prev_;
   v->next_ = &dummy_versions_;
   v->prev_->next_ = v;
@@ -908,11 +942,13 @@ Status VersionSet::Recover(bool* save_manifest) {
                        0 /*initial_offset*/);
     Slice record;
     std::string scratch; // scratch这个函数中并未用到，有啥用？
+    // 读取所有的record，每个record都是一个VersionEdit对象，根据has_xxx_来读取其中包含的字段信息
     while (reader.ReadRecord(&record, &scratch) && s.ok()) {
       VersionEdit edit;
       s = edit.DecodeFrom(record);
       if (s.ok()) {
         // 检查comparator的名字，必须与manifest中记录的一样
+        // 先用has_comparator_来判断是否有comparator，理论上只有一个record含有这个字段。
         if (edit.has_comparator_ &&
             edit.comparator_ != icmp_.user_comparator()->Name()) {
           s = Status::InvalidArgument(
@@ -991,7 +1027,7 @@ Status VersionSet::Recover(bool* save_manifest) {
 
 bool VersionSet::ReuseManifest(const std::string& dscname,
                                const std::string& dscbase) {
-  if (!options_->reuse_logs) {
+  if (!options_->reuse_logs) { 
     return false;
   }
   FileType manifest_type;
@@ -1187,6 +1223,19 @@ void VersionSet::GetRange(const std::vector<FileMetaData*>& inputs,
   assert(!inputs.empty());
   smallest->Clear();
   largest->Clear();
+  // 将原来的循环改成了stl算法，显得更简洁，可读性更好，
+  // 不过原来的一次循环变成了2次循环，性能略有下降。
+  *smallest = (*std::min_element(begin(inputs), end(inputs), 
+    [this](const FileMetaData* lhs, const FileMetaData* rhs){
+      return icmp_.Compare(lhs->smallest, rhs->smallest) < 0;
+  }))->smallest;
+
+  *largest = (*std::max_element(begin(inputs), end(inputs), 
+    [this](const FileMetaData* lhs, const FileMetaData* rhs){
+      return icmp_.Compare(lhs->largest, rhs->largest) < 0;
+  }))->largest;
+  
+  /*
   for (size_t i = 0; i < inputs.size(); i++) {
     FileMetaData* f = inputs[i];
     if (i == 0) {
@@ -1200,7 +1249,7 @@ void VersionSet::GetRange(const std::vector<FileMetaData*>& inputs,
         *largest = f->largest;
       }
     }
-  }
+  }*/
 }
 
 // Stores the minimal range that covers all entries in inputs1 and inputs2

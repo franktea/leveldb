@@ -34,6 +34,7 @@ class Writer {
 
   ~Writer();
 
+  // 向文件中写入一个record
   Status AddRecord(const Slice& slice);
 
  private:

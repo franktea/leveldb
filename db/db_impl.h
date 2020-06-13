@@ -77,11 +77,16 @@ class DBImpl : public DB {
   struct Writer;
 
   // Information for a manual compaction
+  // 如果存在外部触发的compact，根据manual_compaction指定的level/start_key/end_key，
+  // 选出Compaction(VersionSet::CompactRange())，为了避免外部指定的key range太大，
+  // 一次compact太多的sstable文件，manum_compaction可能不会一次做完，用done来标识是否
+  // 全部完成，tmp_storage保存上一次compact到的end key，也就是下一次的start key。
   struct ManualCompaction {
     int level;
-    bool done;
+    bool done; // 指定的compact区间是否完成，如果完成则为true。
     const InternalKey* begin;  // null means beginning of key range
     const InternalKey* end;    // null means end of key range
+    // 如果未完成，tmp_storage记录了当前已经compact的end key
     InternalKey tmp_storage;   // Used to keep track of compaction progress
   };
 

@@ -145,6 +145,7 @@ class Version {
   void ForEachOverlapping(Slice user_key, Slice internal_key, void* arg,
                           bool (*func)(void*, int, FileMetaData*));
 
+  // 在VersionSet里面形成侵入式链表
   VersionSet* vset_;  // VersionSet to which this Version belongs
   Version* next_;     // Next version in linked list
   Version* prev_;     // Previous version in linked list
@@ -166,6 +167,10 @@ class Version {
   int compaction_level_;
 };
 
+// 每次产生一个新的Version以后，其实老的版本就没用了。
+// 但是老的版本有可能依然被应用程序在访问数据（比如说持有指向老版本的Iterator在做遍历工作），
+// 此时还不能马上删除老版本，所以新老几个版本可能会同时存在，VersionSet类用来管理多个版本。
+// 内部采用双向循环链表进行管理多个Version的指针。
 class VersionSet {
  public:
   VersionSet(const std::string& dbname, const Options* options,
@@ -279,6 +284,7 @@ class VersionSet {
 
   bool ReuseManifest(const std::string& dscname, const std::string& dscbase);
 
+  // 初始化Version* v的compaction_score_和compaction_level_
   void Finalize(Version* v);
 
   void GetRange(const std::vector<FileMetaData*>& inputs, InternalKey* smallest,
@@ -293,6 +299,7 @@ class VersionSet {
   // Save current contents to *log
   Status WriteSnapshot(log::Writer* log);
 
+  // 将一个新的Version* v添加到当前VersionSet中
   void AppendVersion(Version* v);
 
   // 从构造函数传入进行初始化的与db相关的成员
@@ -312,8 +319,9 @@ class VersionSet {
   // Opened lazily，manifest相关
   WritableFile* descriptor_file_;
   log::Writer* descriptor_log_;
-  // 循环双向链表的头结点
+  // 循环双向链表的头结点，一个没用的元素，使得链表的操作更简单，和std::list中的实现类似。
   Version dummy_versions_;  // Head of circular doubly-linked list of versions.
+  // current_是当前最新版本，注意它总是指向双向链表的最后一个元素，相当于tail
   Version* current_;        // == dummy_versions_.prev_
 
   // Per-level key at which the next compaction at that level should start.
@@ -323,6 +331,13 @@ class VersionSet {
 };
 
 // A Compaction encapsulates information about a compaction.
+// db中有一个compact后台线程，负责将memtable持久化成sstable，以及均衡整个db中各个level的sstable。
+// compact线程会优先将写满的memtable dump成level 0的sstable（不会合并相同的key或者清理已经删除的key），
+// 然后，根据设计的策略选取level n以及level n+1中有key range overlap的几个sstable进行合并，
+// 期间会合并相同的key以及清理删除的key，最后生成若干个level n+1的sstable。随着数据不断地写入和compact的进行，
+// 低level的sstable不断向高级别level迁移。level 0中的sstable是由memtable直接dump得到，所以key range可能有
+// overlap，而level 1以及更高的级别中的sstable都是有merge产生，保证了位于同一个level的sstalbe之间的
+// key range不会有overlap。
 class Compaction {
  public:
   ~Compaction();
@@ -402,7 +417,7 @@ class Compaction {
   // is that we are positioned at one of the file ranges for each
   // higher level than the ones involved in this compaction (i.e. for
   // all L >= level_ + 2).
-  // compact时，当key的ValueType是kTypeDeletion是，
+  // compact时，当key的ValueType是kTypeDeletion时，
   // 要检查其在level n+1以上是否存在（调用IsBaseLevelForKey())来决定是否
   // 丢弃掉该key。因为compact时，key的遍历是顺序的，所以每次检查从上一次检查结束的地方开始即可。
   // level_ptrs_[i]中就记录了input_vesion_->levels_[i]中，
